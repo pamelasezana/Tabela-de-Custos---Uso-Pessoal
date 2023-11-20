@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <title>Tabela de Custo e Lucro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        table {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        table {
+            width: 90%;
+            max-width: 1000px;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: #fff;
+        }
+
+        #total-cost,
+        #total-profit {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .delete-btn,
+        #add-product-btn,
+        #refresh-btn {
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .delete-btn,
+        .delete-btn:hover {
+            background-color: red;
+        }
+
+        #add-product-btn:hover,
+        #refresh-btn:hover {
+            background-color: #45a049;
+        }
+
+        @media only screen and (max-width: 600px) {
+            table {
+                width: 100%;
+            }
+
+            th,
+            td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            th {
+                text-align: center;
+                background-color: #4CAF50;
+                color: #fff;
+            }
+
+            .delete-btn,
+            #add-product-btn,
+            #refresh-btn {
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Tabela de Custo e Lucro</h2>
+
+    <table id="product-table">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Produto</th>
+                <th>Quantidade</th>
+                <th>Custo (R$)</th>
+                <th>Preço de Venda (R$)</th>
+                <th>Lucro (R$)</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Linhas da tabela -->
+        </tbody>
+    </table>
+
+    <div style="display:flex;">
+        <button id="add-product-btn">Adicionar Produto</button>
+        <button id="refresh-btn" style="margin-left:30px;">Atualizar</button>
+    </div>
+
+    <div id="total-cost">Custo Total: R$ <span id="cost-total">0.00</span></div>
+    <div id="total-profit">Lucro Total: R$ <span id="profit-total">0.00</span></div>
+
+    <!-- Adiciona o canvas para o gráfico -->
+    <canvas id="chart" width="400" height="200"></canvas>
+
+    <script>
+        function calculateTotals() {
+            let costTotal = 0;
+            let profitTotal = 0;
+
+            const rows = document.querySelectorAll("#product-table tbody tr");
+            rows.forEach(row => {
+                const quantity = parseInt(row.querySelector('.quantity-cell').textContent, 10) || 0;
+                const cost = parseFloat(row.querySelector('.cost-cell').textContent.replace(',', '.')) || 0;
+                const price = parseFloat(row.querySelector('.price-cell').textContent.replace(',', '.')) || 0;
+
+                const profit = (price - cost) * quantity;
+
+                row.querySelector('.profit-cell').textContent = profit.toFixed(2);
+
+                costTotal += cost * quantity;
+                profitTotal += profit;
+            });
+
+            document.getElementById("cost-total").textContent = costTotal.toFixed(2);
+            document.getElementById("profit-total").textContent = profitTotal.toFixed(2);
+
+            saveDataToLocalStorage();
+            updateChart();
+        }
+
+        function addNewRow() {
+            const tbody = document.querySelector("#product-table tbody");
+            const newRow = tbody.insertRow();
+
+            const currentDate = new Date().toISOString().split('T')[0];
+
+            newRow.innerHTML = `
+        <td>${currentDate}</td>
+        <td contenteditable="true" class="product-cell">Novo Produto</td>
+        <td contenteditable="true" class="quantity-cell" placeholder="0"></td>
+        <td contenteditable="true" class="cost-cell" placeholder="0.00" onfocus="clearPlaceholder(this)">0.00</td>
+        <td contenteditable="true" class="price-cell" placeholder="0.00" onfocus="clearPlaceholder(this)">0.00</td>
+        <td class="profit-cell">0.00</td>
+        <td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td>
+      `;
+
+            calculateTotals();
+        }
+
+        function deleteRow(button) {
+            const row = button.closest('tr');
+            row.remove();
+            calculateTotals();
+        }
+
+        function saveDataToLocalStorage() {
+            const rows = document.querySelectorAll("#product-table tbody tr");
+            const data = [];
+
+            rows.forEach(row => {
+                const rowData = {
+                    date: row.cells[0].textContent,
+                    product: row.querySelector('.product-cell').textContent,
+                    quantity: row.querySelector('.quantity-cell').textContent,
+                    cost: row.querySelector('.cost-cell').textContent,
+                    price: row.querySelector('.price-cell').textContent
+                };
+
+                data.push(rowData);
+            });
+
+            localStorage.setItem('tableData', JSON.stringify(data));
+        }
+
+        function loadDataFromLocalStorage() {
+            const storedData = localStorage.getItem('tableData');
+
+            if (storedData) {
+                const data = JSON.parse(storedData);
+
+                const tbody = document.querySelector("#product-table tbody");
+                tbody.innerHTML = "";
+
+                data.forEach(rowData => {
+                    const newRow = tbody.insertRow();
+                    newRow.innerHTML = `
+            <td>${rowData.date}</td>
+            <td contenteditable="true" class="product-cell">${rowData.product}</td>
+            <td contenteditable="true" class="quantity-cell" placeholder="0">${rowData.quantity}</td>
+            <td contenteditable="true" class="cost-cell" placeholder="0.00" onfocus="clearPlaceholder(this)">${rowData.cost}</td>
+            <td contenteditable="true" class="price-cell" placeholder="0.00" onfocus="clearPlaceholder(this)">${rowData.price}</td>
+            <td class="profit-cell">0.00</td>
+            <td><button class="delete-btn" onclick="deleteRow(this)">Excluir</button></td>
+          `;
+                });
+
+                calculateTotals();
+            }
+        }
+
+        function clearPlaceholder(element) {
+            if (element.textContent === element.getAttribute('placeholder')) {
+                element.textContent = '';
+            }
+        }
+
+        // Adiciona um evento de entrada para recalcular os totais sempre que os dados são modificados
+        document.getElementById("product-table").addEventListener("input", calculateTotals);
+
+        // Adiciona um evento de clique para adicionar um novo produto
+        document.getElementById("add-product-btn").addEventListener("click", addNewRow);
+
+        // Adiciona um evento de clique para recarregar a página ao clicar no botão "Atualizar"
+        document.getElementById("refresh-btn").addEventListener("click", function () {
+            location.reload();
+        });
+
+        // Carrega os dados do localStorage ao carregar a página
+        window.addEventListener("load", function () {
+            loadDataFromLocalStorage();
+            calculateTotals(); // Adiciona a chamada para calcular totais ao carregar a página
+            setTimeout(updateChart, 500); // Adiciona um atraso para garantir que o gráfico seja atualizado corretamente
+        });
+
+        // Função para criar e atualizar o gráfico
+        function updateChart() {
+            const costTotal = parseFloat(document.getElementById('cost-total').textContent);
+            const profitTotal = parseFloat(document.getElementById('profit-total').textContent);
+
+            const ctx = document.getElementById('chart').getContext('2d');
+            const myChart = new Chart(ctx, {
+                type: 'bar', // Altera o tipo para 'bar'
+                data: {
+                    labels: ['Custo Total', 'Lucro Total'],
+                    datasets: [
+                        {
+                            label: 'Valor (R$)',
+                            data: [costTotal, profitTotal],
+                            backgroundColor: ['#f44336', '#4CAF50'], // Cores de fundo para custo e lucro
+                        },
+                    ],
+                },
+            });
+        }
+    </script>
+
+</body>
+
+</html>
